@@ -316,7 +316,7 @@ void DSP256XLReverbEditor::paint(juce::Graphics& g) {
     // Brushed aluminum background
     juce::ColourGradient bgGrad(
         juce::Colour(85, 85, 90), 0.0f, 0.0f,
-        juce::Colour(55, 55, 60), 0.0f, (float)getHeight(), false);
+        juce::Colour(55, 55, 60), 0.0f, static_cast<float>(getHeight()), false);
     g.setGradientFill(bgGrad);
     g.fillAll();
 
@@ -334,7 +334,7 @@ void DSP256XLReverbEditor::paint(juce::Graphics& g) {
 
     // Section divider under mix slider area
     g.setColour(juce::Colour(100, 100, 105));
-    g.drawLine(20.0f, 260.0f, (float)(getWidth() - 20), 260.0f, 2.0f);
+    g.drawLine(20.0f, 260.0f, static_cast<float>(getWidth() - 20), 260.0f, 2.0f);
 
     // Bottom info
     g.setColour(juce::Colour(140, 140, 145));

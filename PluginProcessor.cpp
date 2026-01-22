@@ -62,7 +62,7 @@ void EnhancedCombFilter::setSize(int samples) {
 float EnhancedCombFilter::process(float input, float stereoSpread) {
     if (buffer.empty()) return input;
 
-    if (writeIndex >= buffer.size()) {
+    if (writeIndex >= static_cast<int>(buffer.size())) {
         writeIndex = 0;
     }
 
@@ -74,7 +74,7 @@ float EnhancedCombFilter::process(float input, float stereoSpread) {
     float safeFeedback = juce::jlimit(0.0f, 0.999f, feedback * spreadMod);
 
     buffer[writeIndex] = input + damped * safeFeedback;
-    writeIndex = (writeIndex + 1) % buffer.size();
+    writeIndex = (writeIndex + 1) % static_cast<int>(buffer.size());
 
     return output;
 }
@@ -113,7 +113,7 @@ void CombFilter::setSize(int samples) {
 float CombFilter::process(float input) {
     if (buffer.empty()) return input;
 
-    if (writeIndex >= buffer.size()) {
+    if (writeIndex >= static_cast<int>(buffer.size())) {
         writeIndex = 0;
     }
 
@@ -122,7 +122,7 @@ float CombFilter::process(float input) {
 
     float safeFeedback = juce::jlimit(0.0f, 0.9999f, feedback);
     buffer[writeIndex] = input + damped * safeFeedback;
-    writeIndex = (writeIndex + 1) % buffer.size();
+    writeIndex = (writeIndex + 1) % static_cast<int>(buffer.size());
     return output;
 }
 
@@ -158,7 +158,7 @@ void AllpassFilter::setSize(int samples) {
 float AllpassFilter::process(float input) {
     if (buffer.empty()) return input;
 
-    if (writeIndex >= buffer.size()) {
+    if (writeIndex >= static_cast<int>(buffer.size())) {
         writeIndex = 0;
     }
 
@@ -166,7 +166,7 @@ float AllpassFilter::process(float input) {
     float safeCoeff = juce::jlimit(0.0f, 0.9999f, coeff);
     float output = -input + bufOut;
     buffer[writeIndex] = input + bufOut * safeCoeff;
-    writeIndex = (writeIndex + 1) % buffer.size();
+    writeIndex = (writeIndex + 1) % static_cast<int>(buffer.size());
     return output;
 }
 
@@ -197,20 +197,20 @@ void DelayLine::setSize(int samples) {
 
 void DelayLine::setDelay(int samples) {
     if (buffer.empty()) return;
-    delaySamples = juce::jlimit(0, (int)buffer.size() - 1, samples);
-    readIndex = (writeIndex - delaySamples + buffer.size()) % buffer.size();
+    delaySamples = juce::jlimit(0, static_cast<int>(buffer.size()) - 1, samples);
+    readIndex = (writeIndex - delaySamples + static_cast<int>(buffer.size())) % static_cast<int>(buffer.size());
 }
 
 float DelayLine::process(float input) {
     if (buffer.empty()) return input;
 
-    if (writeIndex >= buffer.size()) writeIndex = 0;
-    if (readIndex >= buffer.size()) readIndex = 0;
+    if (writeIndex >= static_cast<int>(buffer.size())) writeIndex = 0;
+    if (readIndex >= static_cast<int>(buffer.size())) readIndex = 0;
 
     float output = buffer[readIndex];
     buffer[writeIndex] = input;
-    writeIndex = (writeIndex + 1) % buffer.size();
-    readIndex = (readIndex + 1) % buffer.size();
+    writeIndex = (writeIndex + 1) % static_cast<int>(buffer.size());
+    readIndex = (readIndex + 1) % static_cast<int>(buffer.size());
     return output;
 }
 
@@ -221,7 +221,7 @@ void DelayLine::clear() {
 }
 
 //==============================================================================
-// ReverbProcessor Implementation (FIXED VERSION)
+// ReverbProcessor Implementation
 //==============================================================================
 
 ReverbProcessor::ReverbProcessor() {
@@ -247,7 +247,7 @@ ReverbProcessor::ReverbProcessor() {
 }
 
 void ReverbProcessor::prepare(double sr) {
-    sampleRate = juce::jlimit(22050.0f, 192000.0f, (float)sr);
+    sampleRate = juce::jlimit(22050.0f, 192000.0f, static_cast<float>(sr));
 
     // Initialize smoothers
     initSmoothers(sampleRate);
@@ -316,7 +316,7 @@ void ReverbProcessor::resetWithFade() {
     // Simple fade-out to avoid clicks
     static constexpr int fadeSamples = 64;
     for (int i = 0; i < fadeSamples; ++i) {
-        float fade = 1.0f - (float)i / fadeSamples;
+        float fade = 1.0f - static_cast<float>(i) / fadeSamples;
         for (auto& c : combsL) c.setFeedback(c.feedback * fade);
         for (auto& c : combsR) c.setFeedback(c.feedback * fade);
     }
@@ -401,7 +401,6 @@ void ReverbProcessor::setDryWet(float val) {
     mixSmoother.setTargetValue(dryWet);
 }
 
-// FIXED AUDIO PROCESSING METHOD - MAIN FIX
 void ReverbProcessor::processStereo(float* left, float* right, int numSamples) {
     // Sanity check inputs
     if (left == nullptr || right == nullptr || numSamples <= 0) {
@@ -437,22 +436,19 @@ void ReverbProcessor::processStereo(float* left, float* right, int numSamples) {
         float earlyL = 0.0f, earlyR = 0.0f;
         for (size_t t = 0; t < earlyTaps.size(); ++t) {
             // Progressive panning across taps for natural stereo
-            float pan = (float)t / earlyTaps.size();
+            float pan = static_cast<float>(t) / earlyTaps.size();
             earlyL += earlyTaps[t].first.process(preL) * (1.0f - pan * 0.7f);
             earlyR += earlyTaps[t].second.process(preR) * (0.3f + pan * 0.7f);
         }
-        earlyL = earlyL * earlyReflectionLevel / earlyTaps.size();
-        earlyR = earlyR * earlyReflectionLevel / earlyTaps.size();
-
-        // CRITICAL FIX: Process LEFT and RIGHT channels SEPARATELY
-        // with proper cross-coupling for natural stereo reverb
+        earlyL = earlyL * earlyReflectionLevel / static_cast<float>(earlyTaps.size());
+        earlyR = earlyR * earlyReflectionLevel / static_cast<float>(earlyTaps.size());
 
         // Process left channel through left combs with cross-feed from right
         float combSumL = 0.0f;
         for (size_t c = 0; c < combsL.size(); ++c) {
             // Each comb gets a unique mix of L/R for natural stereo spread
-            float leftWeight = 0.7f + 0.3f * std::sin((float)c * 0.5f);
-            float rightWeight = 0.3f * std::cos((float)c * 0.5f);
+            float leftWeight = 0.7f + 0.3f * std::sin(static_cast<float>(c) * 0.5f);
+            float rightWeight = 0.3f * std::cos(static_cast<float>(c) * 0.5f);
 
             float combInput = (preL * leftWeight + preR * rightWeight * position);
 
@@ -460,20 +456,20 @@ void ReverbProcessor::processStereo(float* left, float* right, int numSamples) {
             float detune = 1.0f + (0.0005f * c);
             combSumL += combsL[c].process(combInput * detune);
         }
-        combSumL /= combsL.size();
+        combSumL /= static_cast<float>(combsL.size());
 
         // Process right channel through right combs with cross-feed from left
         float combSumR = 0.0f;
         for (size_t c = 0; c < combsR.size(); ++c) {
-            float rightWeight = 0.7f + 0.3f * std::cos((float)c * 0.5f);
-            float leftWeight = 0.3f * std::sin((float)c * 0.5f);
+            float rightWeight = 0.7f + 0.3f * std::cos(static_cast<float>(c) * 0.5f);
+            float leftWeight = 0.3f * std::sin(static_cast<float>(c) * 0.5f);
 
             float combInput = (preR * rightWeight + preL * leftWeight * (1.0f - position));
 
             float detune = 1.0f - (0.0005f * c);
             combSumR += combsR[c].process(combInput * detune);
         }
-        combSumR /= combsR.size();
+        combSumR /= static_cast<float>(combsR.size());
 
         // Apply allpass diffusion (series) for smoother tail
         float diffusedL = combSumL;
@@ -577,10 +573,10 @@ void ReverbProcessor::updateAllParameters() {
         if (delaySamples < 1) delaySamples = 1;
 
         // Only resize if needed
-        if (combsL[i].buffer.size() != delaySamples) {
+        if (static_cast<int>(combsL[i].buffer.size()) != delaySamples) {
             combsL[i].setSize(delaySamples);
         }
-        if (combsR[i].buffer.size() != msToSamples(delayMs * 1.02f)) {
+        if (static_cast<int>(combsR[i].buffer.size()) != msToSamples(delayMs * 1.02f)) {
             combsR[i].setSize(msToSamples(delayMs * 1.02f));
         }
     }
@@ -592,10 +588,10 @@ void ReverbProcessor::updateAllParameters() {
 
         if (delaySamples < 1) delaySamples = 1;
 
-        if (allpassesL[i].buffer.size() != delaySamples) {
+        if (static_cast<int>(allpassesL[i].buffer.size()) != delaySamples) {
             allpassesL[i].setSize(delaySamples);
         }
-        if (allpassesR[i].buffer.size() != msToSamples(delayMs * 1.02f)) {
+        if (static_cast<int>(allpassesR[i].buffer.size()) != msToSamples(delayMs * 1.02f)) {
             allpassesR[i].setSize(msToSamples(delayMs * 1.02f));
         }
     }
@@ -608,12 +604,12 @@ void ReverbProcessor::updateAllParameters() {
         int delaySamplesR = msToSamples(delayMs * 1.03f);
 
         // Set size if needed, then delay
-        if (earlyTaps[t].first.buffer.size() < delaySamplesL) {
+        if (static_cast<int>(earlyTaps[t].first.buffer.size()) < delaySamplesL) {
             earlyTaps[t].first.setSize(delaySamplesL * 2);  // Extra headroom
         }
         earlyTaps[t].first.setDelay(delaySamplesL);
 
-        if (earlyTaps[t].second.buffer.size() < delaySamplesR) {
+        if (static_cast<int>(earlyTaps[t].second.buffer.size()) < delaySamplesR) {
             earlyTaps[t].second.setSize(delaySamplesR * 2);
         }
         earlyTaps[t].second.setDelay(delaySamplesR);
@@ -675,7 +671,6 @@ void ReverbProcessor::updateDamping() {
     for (auto& c : combsL) c.setDamp(lpDamp);
     for (auto& c : combsR) c.setDamp(lpDamp);
 
-    // Note: For enhanced comb filters, you'd use setDamping(lpDamp, hpDamp)
     DBG("Damping updated: LP=" << lpDamp << ", HP=" << hpDamp);
 }
 
@@ -700,7 +695,7 @@ void ReverbProcessor::updatePreDelay() {
     if (maxPreDelay < 1) maxPreDelay = 1;
 
     // Only resize if needed
-    if (preDelayL.buffer.size() < maxPreDelay) {
+    if (static_cast<int>(preDelayL.buffer.size()) < maxPreDelay) {
         preDelayL.setSize(maxPreDelay);
         preDelayR.setSize(maxPreDelay);
     }
@@ -738,10 +733,10 @@ void ReverbProcessor::updateSubsequentDelays() {
         int delaySamplesR = msToSamples(delayMs * 1.02f);
 
         // Only resize if needed
-        if (combsL[i].buffer.size() != delaySamplesL) {
+        if (static_cast<int>(combsL[i].buffer.size()) != delaySamplesL) {
             combsL[i].setSize(delaySamplesL);
         }
-        if (combsR[i].buffer.size() != delaySamplesR) {
+        if (static_cast<int>(combsR[i].buffer.size()) != delaySamplesR) {
             combsR[i].setSize(delaySamplesR);
         }
     }
@@ -920,15 +915,6 @@ void DSP256XLReverbProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
         return;
     }
 
-    // Optional: Check for input level
-    float inputLevel = 0.0f;
-    for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
-        const float* channelData = buffer.getReadPointer(ch);
-        for (int i = 0; i < buffer.getNumSamples(); ++i) {
-            inputLevel = std::max(inputLevel, std::abs(channelData[i]));
-        }
-    }
-
     // Get all parameters from APVTS
     reverb.setDecayTime(apvts.getRawParameterValue("decay")->load());
     reverb.setPreDelay(apvts.getRawParameterValue("predelay")->load());
@@ -952,21 +938,6 @@ void DSP256XLReverbProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
     float* right = buffer.getWritePointer(1);
 
     reverb.processStereo(left, right, buffer.getNumSamples());
-
-    // Optional: Check output level
-    float outputLevel = 0.0f;
-    for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
-        const float* channelData = buffer.getReadPointer(ch);
-        for (int i = 0; i < buffer.getNumSamples(); ++i) {
-            outputLevel = std::max(outputLevel, std::abs(channelData[i]));
-        }
-    }
-
-    static int debugCounter = 0;
-    if (debugCounter++ % 100 == 0) {
-        DBG("Processing: input=" << inputLevel << ", output=" << outputLevel
-            << ", reverbLevel=" << reverb.getReverbLevel());
-    }
 }
 
 void DSP256XLReverbProcessor::releaseResources() {

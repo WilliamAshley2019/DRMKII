@@ -60,7 +60,7 @@ public:
 private:
     int writeIndex;
     OnePole lowpass;
-    float damp, feedbackPrivate;
+    float damp;
 };
 
 // Allpass filter for diffusion
@@ -104,10 +104,10 @@ public:
     void clear();
     void processStereo(float* left, float* right, int numSamples);
 
-    // NEW: Get current reverb tail level (for visualization)
+    // Get current reverb tail level (for visualization)
     float getReverbLevel() const { return reverbLevel; }
 
-    // NEW: Reset with fade to avoid clicks
+    // Reset with fade to avoid clicks
     void resetWithFade();
 
     // Parameter setters
@@ -147,13 +147,13 @@ private:
     float subsequentReverbDelay = 1.0f, subsequentLevel = 0.8f, envelopment = 0.8f;
     float normalizedReflectivity = 0.8f, tieLevel = 0.5f, tieLevelGain = 1.0f, position = 0.5f, dryWet = 0.5f;
 
-    // NEW: For visualization and debugging
+    // For visualization and debugging
     float reverbLevel = 0.0f;
 
-    // NEW: Smoothing filters for parameter changes
+    // Smoothing filters for parameter changes
     juce::LinearSmoothedValue<float> decaySmoother, dampingSmoother, mixSmoother;
 
-    // NEW: Initialize smoothers
+    // Initialize smoothers
     void initSmoothers(double sampleRate);
 
     int msToSamples(float ms);
