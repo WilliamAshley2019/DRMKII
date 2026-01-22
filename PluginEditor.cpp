@@ -115,14 +115,19 @@ void ParameterKnobWithLcd::attachParameter(juce::AudioProcessorValueTreeState& a
 void ParameterKnobWithLcd::resized() {
     auto area = getLocalBounds();
     const int lcdHeight = 40;
-    const int knobHeight = area.getHeight() - lcdHeight - 5;
+    const int spacing = 5;
+    const int knobHeight = area.getHeight() - lcdHeight - spacing;
 
-    auto knobArea = area.removeFromTop(knobHeight).reduced(5);
+    // Knob takes top portion (make it square)
+    auto knobArea = area.removeFromTop(knobHeight);
     int knobSize = juce::jmin(knobArea.getWidth(), knobArea.getHeight());
     knob.setBounds(knobArea.withSizeKeepingCentre(knobSize, knobSize));
 
-    area.removeFromTop(5);
-    lcd.setBounds(area.withSizeKeepingCentre(90, 40));
+    // Small spacing
+    area.removeFromTop(spacing);
+
+    // LCD at bottom (centered, fixed aspect)
+    lcd.setBounds(area.withSizeKeepingCentre(juce::jmin(area.getWidth() - 10, 90), 40));
 }
 
 void ParameterKnobWithLcd::updateDisplay() {
@@ -196,13 +201,13 @@ void MixSliderWithLcd::attachParameter(juce::AudioProcessorValueTreeState& apvts
 void MixSliderWithLcd::resized() {
     auto area = getLocalBounds();
 
-    // Label at top
+    // Label at top (20px)
     label.setBounds(area.removeFromTop(20));
 
-    // Slider in middle
+    // Slider in middle (25px)
     slider.setBounds(area.removeFromTop(25));
 
-    // LCD display at bottom (stretches full width)
+    // LCD display takes ALL remaining area (stretches full width)
     lcdDisplay.setBounds(area);
 }
 
@@ -243,7 +248,8 @@ void MixSliderWithLcd::updateDisplay() {
 DSP256XLReverbEditor::DSP256XLReverbEditor(DSP256XLReverbProcessor& p)
     : AudioProcessorEditor(&p), processor(p) {
 
-    setSize(1000, 700);
+    // Start at MAXIMUM size so all knobs are same size initially
+    setSize(1200, 800);
     setResizable(true, true);
     setResizeLimits(800, 550, 1200, 800);
 
@@ -346,27 +352,37 @@ void DSP256XLReverbEditor::paint(juce::Graphics& g) {
 void DSP256XLReverbEditor::resized() {
     auto area = getLocalBounds();
 
-    // Title area
-    area.removeFromTop(80);
+    // Calculate proportional sizes based on current height
+    float scale = static_cast<float>(getHeight()) / 800.0f; // 800 is max height
 
-    // Main LCD
-    auto lcdArea = area.removeFromTop(90);
-    mainLcd.setBounds(lcdArea.reduced(50, 5));
+    // Title area (proportional)
+    int titleHeight = static_cast<int>(80 * scale);
+    area.removeFromTop(titleHeight);
 
-    // Spacing
-    area.removeFromTop(10);
+    // Main LCD (proportional)
+    int lcdHeight = static_cast<int>(90 * scale);
+    auto lcdArea = area.removeFromTop(lcdHeight);
+    int lcdMargin = static_cast<int>(50 * scale);
+    mainLcd.setBounds(lcdArea.reduced(lcdMargin, 5));
 
-    // Mix slider section (with LCD) - Adjusted height
-    auto mixArea = area.removeFromTop(70);  // Enough for label + slider + LCD
-    mixSlider.setBounds(mixArea.reduced(80, 5));
+    // Spacing (proportional)
+    area.removeFromTop(static_cast<int>(10 * scale));
 
-    // Spacing under mix slider
-    area.removeFromTop(15);
+    // Mix slider section - Give it enough space for label + slider + LCD bar
+    int mixHeight = static_cast<int>(70 * scale);
+    auto mixArea = area.removeFromTop(mixHeight);
+    int mixMargin = static_cast<int>(80 * scale);
+    mixSlider.setBounds(mixArea.reduced(mixMargin, 5));
 
-    // 3 rows of knobs
-    const int rowHeight = 160;
-    const int rowSpacing = 15;
-    const int margin = 30;
+    // Spacing under mix slider (proportional)
+    area.removeFromTop(static_cast<int>(15 * scale));
+
+    // Calculate available space for 3 rows of knobs
+    int availableHeight = area.getHeight() - static_cast<int>(30 * scale); // Leave space for bottom text
+    int rowSpacing = static_cast<int>(15 * scale);
+    int rowHeight = (availableHeight - 2 * rowSpacing) / 3; // Divide equally among 3 rows
+
+    int margin = static_cast<int>(30 * scale);
 
     // Row 1: 5 knobs
     auto row1 = area.removeFromTop(rowHeight);
@@ -386,14 +402,14 @@ void DSP256XLReverbEditor::resized() {
 void DSP256XLReverbEditor::layoutKnobRow(juce::Rectangle<int> area, int startIdx, int count, int margin) {
     const int totalWidth = getWidth() - 2 * margin;
     const int knobWidth = totalWidth / count;
-    const int spacing = 5;
+    const int spacing = 10; // Consistent spacing between knobs
 
     for (int i = 0; i < count; ++i) {
         int idx = startIdx + i;
         if (idx < 15 && knobs[idx]) {
-            int x = margin + i * knobWidth;
-            if (i > 0) x += spacing;
-            knobs[idx]->setBounds(x, area.getY(), knobWidth - spacing, area.getHeight());
+            int x = margin + i * knobWidth + (i > 0 ? spacing / 2 : 0);
+            int width = knobWidth - spacing;
+            knobs[idx]->setBounds(x, area.getY(), width, area.getHeight());
         }
     }
 }
